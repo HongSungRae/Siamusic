@@ -51,7 +51,6 @@ class MTA(Dataset):
     def __getitem__(self, index):
         item = self.df.iloc[index]
         waveform = self.item_to_waveform(item)
-        
         return waveform.astype(np.float32), item.values.astype(np.float32)
 
     def item_to_waveform(self, item):
@@ -73,6 +72,9 @@ class MTA(Dataset):
         return audio # Train에서 [1,48000], Test에서 [2,48000]
 
 
+
+
+
 class GTZAN(Dataset):
     '''
     This dataset has 10 classes which has 100 songs each.
@@ -81,13 +83,40 @@ class GTZAN(Dataset):
     def __init__(self,split=None):
         self.data_path =  './dataset/GTZAN/genres_original'
         self.split = split
-        self.genre = ['blues','classical','country','disco','hiphop',
+        self.genres = ['blues','classical','country','disco','hiphop',
                       'jazz','metal','pop','reggae','rock']
         if split not in ['train', 'test', 'validation']:
             raise ValueError("Please tell the data split : train, test,validation")
+        
+        # Data Split & Preprocessing
+        self.df = pd.DataFrame(data={'Path':[], 'Name':[], 'Label':[]})
+        self.Path_list = []
+        self.Name_list = []
+        self.Label_list = []
+        if self.split == 'train':
+            for genre in self.genres:
+                file_list = os.listdir(self.data_path + '/' + genre)
+                self.Name_list += file_list[0:80]
+                self.Path_list += [self.data_path + '/' + genre for _ in range(80)]
+                self.Label_list += [genre for _ in range(80)]
+        elif self.split == 'test':
+            for genre in self.genres:
+                file_list = os.listdir(self.data_path + '/' + genre)
+                self.Name_list += file_list[80:90]
+                self.Path_list += [self.data_path + '/' + genre for _ in range(10)]
+                self.Label_list += [genre for _ in range(10)]
+        else:
+            for genre in self.genres:
+                file_list = os.listdir(self.data_path + '/' + genre)
+                self.Name_list += file_list[90:]
+                self.Path_list += [self.data_path + '/' + genre for _ in range(10)]
+                self.Label_list += [genre for _ in range(10)]
+        self.df = pd.DataFrame(data={'Path':self.Path_list, 
+                                     'Name':self.Name_list, 
+                                     'Label':self.Label_list})
 
     def __len__(self):
-        pass
+        return len(self.df)
 
     def __getitem__(self, idx):
         pass
@@ -96,10 +125,10 @@ class GTZAN(Dataset):
 
 if __name__ == '__main__':
     # MTA
-    mta_data = MTA('test')
-    mta_dataloader = DataLoader(mta_data,batch_size=16,drop_last=True)
-    mta_x, mta_y = next(iter(mta_dataloader))
-    print(f'mta_x : {mta_x.shape} | mta_y : {mta_y.shape}')
+    # mta_data = MTA('test')
+    # mta_dataloader = DataLoader(mta_data,batch_size=16,drop_last=True)
+    # mta_x, mta_y = next(iter(mta_dataloader))
+    # print(f'mta_x : {mta_x.shape} | mta_y : {mta_y.shape}')
 
     # GTZAN
     gtzan_data = GTZAN('train')
