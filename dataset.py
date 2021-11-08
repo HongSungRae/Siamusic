@@ -3,7 +3,7 @@ from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 import numpy as np
 import os
-
+from scipy.io.wavfile import read
 
 
 class MTA(Dataset):
@@ -55,21 +55,21 @@ class MTA(Dataset):
 
     def item_to_waveform(self, item):
         id = item.name
-        path = os.path.join(self.data_path, self.id_to_path[id].replace(".mp3", ".npy")) # pre-extract waveform, for fast loader # npy->mp3
-        waveform = np.load(path) # 128000의 array형태
+        path = os.path.join(self.data_path, self.id_to_path[id].replace(".mp3", ".npy"))
+        waveform = np.load(path) # shape : [128000]
         if self.split in ['train','validation']:
         # 전체 시퀀스(waveform)에서 input_length 만큼만 떼서 사용함
             random_idx = np.random.randint(low=0, high=int(waveform.shape[0] - self.input_length))
             waveform = waveform[random_idx:random_idx+self.input_length] # extract input # [48000]
             audio = np.expand_dims(waveform, axis = 0)# 1 x samples [1,48000]
         elif self.split == 'test':
-            # 전체 시퀀스(waveform)에서 첫 48000, 두번째 48000시퀀스 떼어온다
+        # 전체 시퀀스(waveform)에서 첫 48000, 두번째 48000시퀀스 떼어온다
             chunk_number = waveform.shape[0] // self.input_length # 128000/48000 = 2 라고 나옴
             chunk = np.zeros((chunk_number, self.input_length)) # [2,48000]
             for idx in range(chunk.shape[0]): # == chunk_number = 2
                 chunk[idx] = waveform[idx * self.input_length:(idx+1) * self.input_length]
             audio = chunk
-        return audio # Train에서 [1,48000], Test에서 [2,48000]
+        return audio # Train shape:[1,48000], Test shape:[2,48000]
 
 
 
@@ -118,8 +118,22 @@ class GTZAN(Dataset):
     def __len__(self):
         return len(self.df)
 
-    def __getitem__(self, idx):
-        pass
+    def get_waveform(self,data_path):
+        waveform = read(data_path)
+        waveform = np.array(waveform[1],dtype=float) # shape:[661794]
+        if self.split in ['train','validation']:
+            pass
+        else:
+            pass
+        return waveform
+        
+    def __getitem__(self, index):
+        genre = self.df['Label'][index]
+        label = torch.zeros(10)
+        label[self.genres.index(genre)] = 1
+        data_path = self.df['Path'][index] + '/' + self.df['Name'][index]
+        waveform = self.get_waveform(data_path)
+        return waveform, label
 
 
 
@@ -132,4 +146,6 @@ if __name__ == '__main__':
 
     # GTZAN
     gtzan_data = GTZAN('train')
-    #gtzan_dataloader = DataLoader(gtzan_data,batch_size=16,drop_last=True)
+    gtzan_dataloader = DataLoader(gtzan_data,batch_size=16,drop_last=True)
+    gtzan_x, gtzan_y = next(iter(gtzan_dataloader))
+    print(f'gtzan_x : {gtzan_x.shape} | gtzan_y : {gtzan_y.shape}')
