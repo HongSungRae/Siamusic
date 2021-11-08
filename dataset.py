@@ -57,19 +57,12 @@ class MTA(Dataset):
         id = item.name
         path = os.path.join(self.data_path, self.id_to_path[id].replace(".mp3", ".npy"))
         waveform = np.load(path) # shape : [128000]
-        if self.split in ['train','validation']:
+        
         # 전체 시퀀스(waveform)에서 input_length 만큼만 떼서 사용함
-            random_idx = np.random.randint(low=0, high=int(waveform.shape[0] - self.input_length))
-            waveform = waveform[random_idx:random_idx+self.input_length] # extract 48000 sequence
-            audio = np.expand_dims(waveform, axis = 0) # expand to [1,48000]
-        elif self.split == 'test':
-        # 전체 시퀀스(waveform)에서 첫 48000, 두번째 48000시퀀스 떼어온다
-            chunk_number = waveform.shape[0] // self.input_length # 128000/48000 = 2 라고 나옴
-            chunk = np.zeros((chunk_number, self.input_length)) # [2,48000]
-            for idx in range(chunk.shape[0]): # == chunk_number = 2
-                chunk[idx] = waveform[idx * self.input_length:(idx+1) * self.input_length]
-            audio = chunk
-        return audio # Train shape:[1,48000], Test shape:[2,48000]
+        random_idx = np.random.randint(low=0, high=int(waveform.shape[0] - self.input_length))
+        waveform = waveform[random_idx:random_idx+self.input_length] # extract 48000 sequence
+        audio = np.expand_dims(waveform, axis = 0) # expand to [1,48000]
+        return audio
 
 
 
@@ -122,12 +115,9 @@ class GTZAN(Dataset):
     def get_waveform(self,data_path):
         waveform = read(data_path)
         waveform = np.array(waveform[1],dtype=float) # shape:[661794]
-        if self.split in ['train','validation']:
-            random_idx = np.random.randint(low=0, high=int(waveform.shape[0] - self.input_length))
-            waveform = waveform[random_idx:random_idx+self.input_length] # extract 48000 sequence
-            audio = np.expand_dims(waveform, axis = 0) # expand to [1,48000]
-        else:
-            pass
+        random_idx = np.random.randint(low=0, high=int(waveform.shape[0] - self.input_length))
+        waveform = waveform[random_idx:random_idx+self.input_length] # extract 48000 sequence
+        audio = np.expand_dims(waveform, axis = 0) # expand to [1,48000]
         return audio
         
     def __getitem__(self, index):
@@ -148,7 +138,7 @@ if __name__ == '__main__':
     print(f'mta_x : {mta_x.shape} | mta_y : {mta_y.shape}')
 
     # GTZAN
-    gtzan_data = GTZAN('train')
+    gtzan_data = GTZAN('validation')
     gtzan_dataloader = DataLoader(gtzan_data,batch_size=16,drop_last=True)
     gtzan_x, gtzan_y = next(iter(gtzan_dataloader))
     print(f'gtzan_x : {gtzan_x.shape} | gtzan_y : {gtzan_y.shape}')
