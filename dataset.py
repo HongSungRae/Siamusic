@@ -60,8 +60,8 @@ class MTA(Dataset):
         if self.split in ['train','validation']:
         # 전체 시퀀스(waveform)에서 input_length 만큼만 떼서 사용함
             random_idx = np.random.randint(low=0, high=int(waveform.shape[0] - self.input_length))
-            waveform = waveform[random_idx:random_idx+self.input_length] # extract input # [48000]
-            audio = np.expand_dims(waveform, axis = 0)# 1 x samples [1,48000]
+            waveform = waveform[random_idx:random_idx+self.input_length] # extract 48000 sequence
+            audio = np.expand_dims(waveform, axis = 0) # expand to [1,48000]
         elif self.split == 'test':
         # 전체 시퀀스(waveform)에서 첫 48000, 두번째 48000시퀀스 떼어온다
             chunk_number = waveform.shape[0] // self.input_length # 128000/48000 = 2 라고 나옴
@@ -80,9 +80,10 @@ class GTZAN(Dataset):
     This dataset has 10 classes which has 100 songs each.
     All songs are 30 seconds length.
     '''
-    def __init__(self,split=None):
+    def __init__(self,split=None,input_length=48000):
         self.data_path =  './dataset/GTZAN/genres_original'
         self.split = split
+        self.input_length = input_length
         self.genres = ['blues','classical','country','disco','hiphop',
                       'jazz','metal','pop','reggae','rock']
         if split not in ['train', 'test', 'validation']:
@@ -122,27 +123,29 @@ class GTZAN(Dataset):
         waveform = read(data_path)
         waveform = np.array(waveform[1],dtype=float) # shape:[661794]
         if self.split in ['train','validation']:
-            pass
+            random_idx = np.random.randint(low=0, high=int(waveform.shape[0] - self.input_length))
+            waveform = waveform[random_idx:random_idx+self.input_length] # extract 48000 sequence
+            audio = np.expand_dims(waveform, axis = 0) # expand to [1,48000]
         else:
             pass
-        return waveform
+        return audio
         
     def __getitem__(self, index):
         genre = self.df['Label'][index]
         label = torch.zeros(10)
         label[self.genres.index(genre)] = 1
         data_path = self.df['Path'][index] + '/' + self.df['Name'][index]
-        waveform = self.get_waveform(data_path)
-        return waveform, label
+        audio = self.get_waveform(data_path)
+        return audio, label
 
 
 
 if __name__ == '__main__':
     # MTA
-    # mta_data = MTA('test')
-    # mta_dataloader = DataLoader(mta_data,batch_size=16,drop_last=True)
-    # mta_x, mta_y = next(iter(mta_dataloader))
-    # print(f'mta_x : {mta_x.shape} | mta_y : {mta_y.shape}')
+    mta_data = MTA('test')
+    mta_dataloader = DataLoader(mta_data,batch_size=16,drop_last=True)
+    mta_x, mta_y = next(iter(mta_dataloader))
+    print(f'mta_x : {mta_x.shape} | mta_y : {mta_y.shape}')
 
     # GTZAN
     gtzan_data = GTZAN('train')
