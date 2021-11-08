@@ -11,3 +11,8 @@ the presentation of POP music well.
 
 ### 2
 # 아티스트별로 구분하여 비슷한 아티스트끼리 묶기
+
+
+
+if __name__ == '__main__':
+    pass
