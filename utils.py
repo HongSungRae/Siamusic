@@ -1,3 +1,6 @@
+from os import environ
+environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
+
 import numpy as np
 from matplotlib import pyplot as plt
 from collections.abc import Iterable
@@ -9,6 +12,16 @@ import pygame.mixer
 import winsound
 import IPython.display as ipd
 import time
+
+
+
+
+
+
+
+
+
+
 
 
 def listen(audio,fs):
@@ -127,15 +140,15 @@ if __name__ == '__main__':
     mta_data = MTA('test',fs)
     mta_dataloader = DataLoader(mta_data,batch_size=16,drop_last=True,shuffle=True)
     mta_x, mta_y = next(iter(mta_dataloader))
-    gtzan_data = GTZAN('validation',fs)
+    gtzan_data = GTZAN('validation',300000)
     gtzan_dataloader = DataLoader(gtzan_data,batch_size=16,drop_last=True,shuffle=True)
     gtzan_x, gtzan_y = next(iter(gtzan_dataloader))
     listen(mta_x[0,0],fs)
     time.sleep(1)
-    listen(gtzan_x[0,0],fs)
+    listen(gtzan_x[0,0],300000)
 
     # Test listen_raw()
-    EnterSandman = './dataset/GTZAN/genres_original/metal/metal.00033.wav'
-    SnoopDogg = './dataset/GTZAN/genres_original/hiphop/hiphop.00033.wav'
-    listen_raw(SnoopDogg)
-    listen_raw(EnterSandman)
+    # EnterSandman = './dataset/GTZAN/genres_original/metal/metal.00033.wav'
+    # SnoopDogg = './dataset/GTZAN/genres_original/hiphop/hiphop.00033.wav'
+    # listen_raw(SnoopDogg)
+    # listen_raw(EnterSandman)
