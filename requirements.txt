@@ -2,3 +2,4 @@ torchaudio
 pedalboard
 sounddevice
 librosa
+torchmetrics
