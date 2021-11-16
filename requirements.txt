@@ -1,3 +1,4 @@
 torchaudio
 pedalboard
 sounddevice
+librosa
