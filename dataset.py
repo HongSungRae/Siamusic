@@ -3,7 +3,9 @@ from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 import numpy as np
 import os
-from scipy.io.wavfile import read
+import librosa
+# from scipy.io.wavfile import read
+
 
 
 class MTA(Dataset):
@@ -113,8 +115,10 @@ class GTZAN(Dataset):
         return len(self.df)
 
     def get_waveform(self,data_path):
-        waveform = read(data_path)
-        waveform = np.array(waveform[1],dtype=float) # shape:[661794]
+        waveform,_ = librosa.load(data_path,sr=22050)
+        waveform = np.array(waveform,dtype=float)
+        #waveform = read(data_path)
+        #waveform = np.array(waveform[1],dtype=float) # shape:[661794]
         random_idx = np.random.randint(low=0, high=int(waveform.shape[0] - self.input_length))
         waveform = waveform[random_idx:random_idx+self.input_length] # extract 48000 sequence
         audio = np.expand_dims(waveform, axis = 0) # expand to [1,48000]
