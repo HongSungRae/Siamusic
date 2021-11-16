@@ -75,14 +75,14 @@ def sungrea_pedal(audio,sample_rate=44100):
                                   # threshold_db: float = 0, ratio: float = 1, attack_ms: float = 1.0, release_ms: float = 100
                                   Gain(gain_db=random.randrange(-15,30)),
                                   # gain_db: float = 1.0
-                                  Chorus(rate_hz=random.randrange(1,50), 
-                                         depth = random.randrange(0,8), 
+                                  Chorus(rate_hz=random.randrange(1,30), 
+                                         depth = random.randrange(0,5), 
                                          centre_delay_ms= 7.0, feedback = 0.0, mix = 0.5), 
                                   # rate_hz: float = 1.0, depth: float = 0.25, centre_delay_ms: float = 7.0, feedback: float = 0.0, mix: float = 0.5
                                   LadderFilter(mode=LadderFilter.Mode.HPF12, cutoff_hz=200, resonance=0, drive=random.randrange(1,6)), 
                                   # cutoff_hz: float = 200, resonance: float = 0, drive: float = 1.0
                                   Phaser(rate_hz=random.randrange(-5,6), 
-                                         depth=random.randrange(-100,100), feedback=0.25, mix=1.0), 
+                                         depth=random.randrange(-10,10), feedback=0.25, mix=1.0), 
                                   # rate_hz: float = 1.0, depth: float = 0.5, centre_frequency_hz: float = 1300.0, feedback: float = 0.0, mix: float = 0.5
                                   Distortion(drive_db=random.randrange(0,20)),
                                   # drive_db: float = 25
@@ -102,26 +102,27 @@ def sungrea_pedal(audio,sample_rate=44100):
 
 
 if __name__ == '__main__':
+    input_length = 120000
     # MTA
     print('== MTA ==')
-    mta_data = MTA('test')
+    mta_data = MTA('test',input_length=input_length)
     mta_dataloader = DataLoader(mta_data,batch_size=1,drop_last=True,shuffle=True)
     mta_x, mta_y = next(iter(mta_dataloader))
     print('Origianl Sounds')
-    listen(mta_x[0,0],48000)
+    listen(mta_x[0,0])
     aug = sungrea_pedal(mta_x)
     time.sleep(1)
     print('Now on pedal sounds')
-    listen(aug[0,0],48000)
+    listen(aug[0,0])
 
     # GTZAN
     print('== GTZAN ==')
-    gtzan_data = GTZAN('validation')
+    gtzan_data = GTZAN('validation',input_length=input_length)
     gtzan_dataloader = DataLoader(gtzan_data,batch_size=1,drop_last=True,shuffle=True)
     gtzan_x, gtzan_y = next(iter(gtzan_dataloader))
     print('Origianl Sounds')
-    listen(gtzan_x[0,0],48000)
+    listen(gtzan_x[0,0])
     aug = sungrea_pedal(gtzan_x)
     time.sleep(1)
     print('Now on pedal sounds')
-    listen(aug[0,0],48000)
+    listen(aug[0,0])
