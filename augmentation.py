@@ -66,7 +66,7 @@ $ : 영향큼
     - $freeze_mode : 0~1
 '''
 
-def sungrea_pedal(audio,sample_rate=44100):
+def sungrae_pedal(audio,sample_rate=44100):
     # audio.shape = (B, 1, 48000)
     aug_audio = audio.clone()
     sample_rate = sample_rate
@@ -102,7 +102,7 @@ def sungrea_pedal(audio,sample_rate=44100):
 
 
 if __name__ == '__main__':
-    input_length = 120000
+    input_length = 48000
     # MTA
     print('== MTA ==')
     mta_data = MTA('test',input_length=input_length)
@@ -110,7 +110,7 @@ if __name__ == '__main__':
     mta_x, mta_y = next(iter(mta_dataloader))
     print('Origianl Sounds')
     listen(mta_x[0,0])
-    aug = sungrea_pedal(mta_x)
+    aug = sungrae_pedal(mta_x)
     time.sleep(1)
     print('Now on pedal sounds')
     listen(aug[0,0])
@@ -122,7 +122,7 @@ if __name__ == '__main__':
     gtzan_x, gtzan_y = next(iter(gtzan_dataloader))
     print('Origianl Sounds')
     listen(gtzan_x[0,0])
-    aug = sungrea_pedal(gtzan_x)
+    aug = sungrae_pedal(gtzan_x)
     time.sleep(1)
     print('Now on pedal sounds')
     listen(aug[0,0])
