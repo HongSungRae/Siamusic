@@ -1,6 +1,10 @@
 '''
 This module verifies that the trained model classifies
 the presentation of POP music well.
+
+== The Artist List ==
+['Beenzino', 'Oasis', '2NE1', 'IU', 'Green Day'
+ 'NELL', 'LOCO', 'Dinimic Duo', 'Red Velvet', 'Pink Floyd']
 '''
 
 
