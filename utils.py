@@ -1,13 +1,23 @@
 import numpy as np
-import IPython.display as ipd
-from scipy.io.wavfile import read
-from torch.utils import data
-from playsound import playsound
-import pygame # 이유는 모르겠는데 얘도 같이 import해야 playsound가 작동함
 from matplotlib import pyplot as plt
-from collections import Iterable
+from collections.abc import Iterable
+import sounddevice as sd
+from dataset import MTA, GTZAN
+from torch.utils.data import DataLoader
+import pygame
+import pygame.mixer
+import winsound
+import IPython.display as ipd
+import time
 
-def listen(data_path):
+
+def listen(audio,fs):
+    # 'audio' is waveform which type is torch.tensor
+    # audio shape : [fs]
+    sd.play(audio, fs, blocking=True)
+
+
+def listen_raw(data_path):
     if 'MTA' in data_path:
         waveform = np.load(data_path.replace(".mp3",".npy"))
         ipd.Audio(waveform, rate=16000)
@@ -15,8 +25,7 @@ def listen(data_path):
         pygame.mixer.music.load(data_path)
         pygame.mixer.music.play()
     elif 'GTZAN' in data_path:
-        playsound(data_path)
-
+        winsound.PlaySound(data_path, winsound.SND_FILENAME)
 
 
 
@@ -113,12 +122,20 @@ def draw_curve(work_dir, train_logger, test_logger):
 
 
 if __name__ == '__main__':
-    # MTA
-    data_path = './dataset/MTA/waveform/b/altri_stromenti-uccellini-01-confitebor_monteverdi-0-29.npy'
-    listen(data_path)
+    # Test listen()
+    fs = 48000
+    mta_data = MTA('test',fs)
+    mta_dataloader = DataLoader(mta_data,batch_size=16,drop_last=True,shuffle=True)
+    mta_x, mta_y = next(iter(mta_dataloader))
+    gtzan_data = GTZAN('validation',fs)
+    gtzan_dataloader = DataLoader(gtzan_data,batch_size=16,drop_last=True,shuffle=True)
+    gtzan_x, gtzan_y = next(iter(gtzan_dataloader))
+    listen(mta_x[0,0],fs)
+    time.sleep(1)
+    listen(gtzan_x[0,0],fs)
 
-    # GTZAN
-    # Master_Of_Puppets = './dataset/GTZAN/genres_original/metal/metal.00033.wav'
-    # The_Trooper = './dataset/GTZAN/genres_original/metal/metal.00034.wav'
-    # listen(Master_Of_Puppets)
-    # listen(The_Trooper)
+    # Test listen_raw()
+    EnterSandman = './dataset/GTZAN/genres_original/metal/metal.00033.wav'
+    SnoopDogg = './dataset/GTZAN/genres_original/hiphop/hiphop.00033.wav'
+    listen_raw(SnoopDogg)
+    listen_raw(EnterSandman)
