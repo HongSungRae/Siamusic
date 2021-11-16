@@ -8,14 +8,21 @@ import torch.optim as optim
 import json
 import torch.nn as nn
 from torch.optim import lr_scheduler
+from tqdm import tqdm
+from torchmetrics import F1,AUROC,Accuracy,Recall
 
 # local
 from utils import *
 from dataset import MTA, GTZAN
+from loss import SiamusicLoss
+from augmentation import sungrae_pedal
 
 parser = argparse.ArgumentParser(description='Siamusic')
 parser.add_argument('--save_path', default='./exp', type=str,
                     help='data path')
+parser.add_argument('--backbone', default='ResNet34', type=str,
+                    help='backbone network for simsiam',
+                    choice=['ResNet34','ResNet50','ResNet101','VGG16','Transformer','ViT'])
 parser.add_argument('--dataset', default='MTA', type=str,
                     help='dataset',choice=['MTA','GTZAN'])
 parser.add_argument('--input_length', default=48000, type=int,
@@ -34,18 +41,41 @@ parser.add_argument('--inference_only', default=False, type=bool,
                     action=argparse.BooleanOptionalAction,
                     help='How To Make TRUE? : --no-inference_only')
 									
-    
-
 parser.add_argument('--gpu_id', default='0', type=str,
                     help='How To Check? : cmd -> nvidia-smi')
 args = parser.parse_args()
 
-# local
-from dataset import MTA, GTZAN
 
 
-def train():
-    pass
+def train(model, predictor, trn_loader, criterion, optimizer, epoch, num_epoch, train_logger):
+    '''
+    p1, p2, z1, z2 = model(x1=images[0], x2=images[1])
+        loss = -(criterion(p1, z2).mean() + criterion(p2, z1).mean()) * 0.5
+
+        losses.update(loss.item(), images[0].size(0))
+
+        # compute gradient and do SGD step
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+    '''
+    model.train()
+    train_loss = AverageMeter()
+    for i, (audio,target) in enumerate(trn_loader):
+        audio = audio.cuda() # SSL has no target
+        x1, x2 = sungrae_pedal(audio), sungrae_pedal(audio) # augmentation
+        p1, z2, p2, z1 = model(x1,x2) # backbone(+projection) + predictor
+        loss = criterion(p1,z2,p2,z1)
+        
+        train_loss.update(loss.item())
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        if i % 10 == 0 and i != 0:
+            print('Epoch : [{0}/{1}] [{2}/{3}]  Train Loss : {loss:.4f}'.format(
+                epoch, num_epoch, i, len(trn_loader), loss=loss))
+    train_logger.write([epoch, train_loss.avg])
 
 
 def validation():
@@ -87,7 +117,7 @@ def main():
     print('=== DataLoader R.e.a.d.y ===')
 
     # define criterion
-    criterion = nn.CrossEntropyLoss().cuda()
+    criterion = SiamusicLoss().cuda()
     if args.optim == 'sgd':
         optimizer = optim.SGD(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     elif args.optim == 'adam':
@@ -102,11 +132,22 @@ def main():
     val_logger = Logger(os.path.join(save_path, 'val_loss.log'))
     test_logger = Logger(os.path.join(save_path, 'test_loss.log'))
     
-    if args.inference_only:
+    if args.inference_only: # Test only
         pass #학습된 모델 불러와서 테스트만 진행
-    else:
-        pass #학습과 validation 모델저장
-
+    else: # (Train -> Val)xEpochs and then, Test
+        for epoch in tqdm(range(1,args.epochs+1)):
+            train(model, train_loader, criterion ,optimizer, epoch, args.epochs, train_logger)
+            validation(model, val_loader, criterion, epoch, args.epochs, val_logger)
+            scheduler.step()
+            if epoch%20 == 0 or epoch == args.epochs :
+                path = '{0}/{1}_{2}_{3}.pth'.format(save_path,
+                                                    args.backbone,
+                                                    args.dataset,
+                                                    epoch)
+                torch.save(model.state_dict(), path)    
+        draw_curve(save_path, train_logger, val_logger)
+        
+    print(f"Process Complete : it took {1}")
 
 if __name__ == '__main__':
     main()
