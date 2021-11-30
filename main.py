@@ -11,12 +11,14 @@ from torch.optim import lr_scheduler
 from tqdm import tqdm
 from torchmetrics import F1,AUROC,Accuracy,Recall
 import time
+import sys
 
 # local
 from utils import *
-from dataset import MTA, GTZAN
+from dataset import MTA, GTZAN, WAVAudio
 from loss import SiamusicLoss
-from augmentation import sungrae_pedal
+from augmentation import sungrae_pedal, random_mix
+from simsiam import Siamusic
 
 parser = argparse.ArgumentParser(description='Siamusic')
 parser.add_argument('--save_path', default='./exp', type=str,
@@ -38,9 +40,11 @@ parser.add_argument('--weight_decay', default=0.00001, type=float,
                     help='weight_decay')
 parser.add_argument('--epochs', default=300, type=int,
                     help='train epoch')
-parser.add_argument('--inference_only', default=False, type=bool,
+parser.add_argument('--augmentation', default='pedalboard', type=str,
+                    help='train epoch',choice=['pedalboard','randommix','iamge'])
+parser.add_argument('--from_scratch', default=False, type=bool,
                     action=argparse.BooleanOptionalAction,
-                    help='How To Make TRUE? : --no-inference_only')
+                    help='How To Make TRUE? : --no-from_scratch')
 									
 parser.add_argument('--gpu_id', default='0', type=str,
                     help='How To Check? : cmd -> nvidia-smi')
@@ -51,9 +55,14 @@ start = time.time()
 def train(model, trn_loader, criterion, optimizer, epoch, num_epoch, train_logger):
     model.train()
     train_loss = AverageMeter()
-    for i, (audio,target) in enumerate(trn_loader):
+    for i, audio in enumerate(trn_loader):
         audio = audio.cuda() # SSL has no target
-        x1, x2 = sungrae_pedal(audio), sungrae_pedal(audio) # augmentation
+        if args.augmentation == 'pedalboard':
+            x1, x2 = sungrae_pedal(audio), sungrae_pedal(audio)
+        elif args.augmentation == 'randommix':
+            x1, x2 = random_mix(audio), random_mix(audio)
+        elif args.augmentation == 'image':
+            sys.exit('곧 업데이트 예정')
         p1, z2, p2, z1 = model(x1,x2) # backbone(+projection) + predictor
         loss = criterion(p1,z2,p2,z1)
         
@@ -72,7 +81,7 @@ def validation(model, val_loader, criterion, epoch, num_epochs, val_logger):
     model.eval()
     val_loss = AverageMeter()
     with torch.no_grad():
-        for i, (audio, target) in enumerate(val_loader):
+        for i, audio in enumerate(val_loader):
             audio = audio.cuda()
             x1, x2 = sungrae_pedal(audio), sungrae_pedal(audio) # 어그멘트 해야하나??
             p1,z2,p2,z1 = model(x1, x2)
@@ -101,42 +110,49 @@ def main():
 
     # define architecture
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id
-    model = SimSiam(backbone=args.backbone).cuda()
+    model = Siamusic(backbone=args.backbone).cuda()
 
-    # dataset loading
-    if args.dataset == 'MTA':
-        train_dataset = MTA(split='train',input_length=args.input_length)
-        val_dataset = MTA(split='validation',input_length=args.input_length)
-        test_dataset = MTA(split='test',input_length=args.input_length)
-    elif args.dataset == 'GTZAN':
-        train_dataset = GTZAN(split='train',input_length=args.input_length)
-        val_dataset = GTZAN(split='validation',input_length=args.input_length)
-        test_dataset = GTZAN(split='test',input_length=args.input_length)
-    train_loader = DataLoader(train_dataset,batch_size=args.batch_size,num_workers=2,shuffle=True)
-    val_loader = DataLoader(val_dataset,batch_size=args.batch_size,num_workers=2,shuffle=False)
-    test_loader = DataLoader(test_dataset,batch_size=args.batch_size,num_workers=2,shuffle=False)
-    print('=== DataLoader R.e.a.d.y ===')
-
-    # define criterion
-    criterion = SiamusicLoss().cuda()
-    if args.optim == 'sgd':
-        optimizer = optim.SGD(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    elif args.optim == 'adam':
-        optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    elif args.optim == 'adagrad':
-        optimizer = optim.Adagrad(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    milestones = [int(args.epochs/3),int(args.epochs/2)]
-    scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=0.7)
-
-    # logger
-    train_logger = Logger(os.path.join(save_path, 'train_loss.log'))
-    val_logger = Logger(os.path.join(save_path, 'val_loss.log'))
-    test_logger = Logger(os.path.join(save_path, 'test_loss.log'))
     
-    # train val test
-    if args.inference_only: # Test only
-        pass #학습된 모델 불러와서 테스트만 진행
-    else: # (Train -> Val)xEpochs and then, Test
+    # pre-training or fine-tuning
+    if args.from_scratch: ## fine-tuning
+        # dataset loading
+        if args.dataset == 'MTA':
+            train_dataset = MTA(split='train',input_length=args.input_length)
+            val_dataset = MTA(split='validation',input_length=args.input_length)
+            test_dataset = MTA(split='test',input_length=args.input_length)
+        elif args.dataset == 'GTZAN':
+            train_dataset = GTZAN(split='train',input_length=args.input_length)
+            val_dataset = GTZAN(split='validation',input_length=args.input_length)
+            test_dataset = GTZAN(split='test',input_length=args.input_length)
+        train_loader = DataLoader(train_dataset,batch_size=args.batch_size,num_workers=2,shuffle=True)
+        val_loader = DataLoader(val_dataset,batch_size=args.batch_size,num_workers=2,shuffle=False)
+        test_loader = DataLoader(test_dataset,batch_size=args.batch_size,num_workers=2,shuffle=False)
+        print('=== DataLoader R.e.a.d.y ===')
+    else: ## pre-training
+        # dataset loading
+        train_dataset = WAVAudio(split='train',input_length=args.input_length)
+        val_dataset = WAVAudio(split='validation',input_length=args.input_length)
+        train_loader = DataLoader(train_dataset,batch_size=args.batch_size,num_workers=2,shuffle=True)
+        val_loader = DataLoader(val_dataset,batch_size=args.batch_size,num_workers=2,shuffle=False)
+        print('=== DataLoader R.e.a.d.y ===')
+
+        # define criterion
+        criterion = SiamusicLoss().cuda()
+        if args.optim == 'sgd':
+            optimizer = optim.SGD(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+        elif args.optim == 'adam':
+            optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+        elif args.optim == 'adagrad':
+            optimizer = optim.Adagrad(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+        milestones = [int(args.epochs/3),int(args.epochs/2)]
+        scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=0.7)
+
+        # logger
+        train_logger = Logger(os.path.join(save_path, 'train_loss.log'))
+        val_logger = Logger(os.path.join(save_path, 'val_loss.log'))
+        test_logger = Logger(os.path.join(save_path, 'test_loss.log'))
+
+        # 학습시작
         for epoch in tqdm(range(1,args.epochs+1)):
             train(model, train_loader, criterion ,optimizer, epoch, args.epochs, train_logger)
             validation(model, val_loader, criterion, epoch, args.epochs, val_logger)
