@@ -27,7 +27,7 @@ import time
 def listen(audio,fs=48000):
     # 'audio' is waveform which type is torch.tensor
     # audio shape : [fs]
-    sd.play(audio, 18000, blocking=True)
+    sd.play(audio, 22050, blocking=True)
 
 
 def listen_raw(data_path):
@@ -136,7 +136,7 @@ def draw_curve(work_dir, train_logger, test_logger):
 
 if __name__ == '__main__':
     ## Test listen()
-    fs = 96000
+    fs = 48000
     mta_data = MTA('test',fs)
     mta_dataloader = DataLoader(mta_data,batch_size=1,drop_last=True,shuffle=True)
     mta_x, mta_y = next(iter(mta_dataloader))

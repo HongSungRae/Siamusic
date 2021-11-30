@@ -75,9 +75,9 @@ def sungrae_pedal(audio,sample_rate=44100):
                                   # threshold_db: float = 0, ratio: float = 1, attack_ms: float = 1.0, release_ms: float = 100
                                   Gain(gain_db=random.randrange(-15,30)),
                                   # gain_db: float = 1.0
-                                  Chorus(rate_hz=random.randrange(1,30), 
-                                         depth = random.randrange(0,5), 
-                                         centre_delay_ms= 7.0, feedback = 0.0, mix = 0.5), 
+                                  Chorus(rate_hz=random.randrange(1,7), 
+                                         depth = random.randrange(0,4), 
+                                         centre_delay_ms= 4.0, feedback = 0.0, mix = 0.5), 
                                   # rate_hz: float = 1.0, depth: float = 0.25, centre_delay_ms: float = 7.0, feedback: float = 0.0, mix: float = 0.5
                                   LadderFilter(mode=LadderFilter.Mode.HPF12, cutoff_hz=200, resonance=0, drive=random.randrange(1,6)), 
                                   # cutoff_hz: float = 200, resonance: float = 0, drive: float = 1.0
@@ -99,6 +99,25 @@ def sungrae_pedal(audio,sample_rate=44100):
         aug_audio[idx] = torch.unsqueeze(torch.tensor(pedal_out),0)
         
     return aug_audio # (B, 1, 48000)
+
+
+
+
+def random_mix(audio,n_patchs=None):
+    assert n_patchs != None
+    if audio.shape[-1]%n_patchs != 0:
+        raise ValueError('오디오 시퀀스가 patch수 만큼 정수로 나눠지지 않습니다')
+    aug_audio = audio.clone()
+    divide = int(audio.shape[-1]/n_patchs)
+    for idx in range(audio.shape[0]):
+        random_idx = [i for i in range(n_patchs)]
+        random.shuffle(random_idx)
+        temp = audio[idx].clone()
+        for i,molayo in enumerate(random_idx):
+            temp[0][i*divide:(i+1)*divide] = audio[idx][0][molayo*divide:(molayo+1)*divide]
+        aug_audio[idx] = temp
+    return aug_audio
+
 
 
 if __name__ == '__main__':

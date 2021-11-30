@@ -10,6 +10,7 @@ import torch.nn as nn
 from torch.optim import lr_scheduler
 from tqdm import tqdm
 from torchmetrics import F1,AUROC,Accuracy,Recall
+import time
 
 # local
 from utils import *
@@ -22,7 +23,7 @@ parser.add_argument('--save_path', default='./exp', type=str,
                     help='data path')
 parser.add_argument('--backbone', default='ResNet34', type=str,
                     help='backbone network for simsiam',
-                    choice=['ResNet34','ResNet50','ResNet101','VGG16','Transformer','ViT'])
+                    choice=['ResNet34','ResNet50','ResNet101','VGG16','Transformer'])
 parser.add_argument('--dataset', default='MTA', type=str,
                     help='dataset',choice=['MTA','GTZAN'])
 parser.add_argument('--input_length', default=48000, type=int,
@@ -44,21 +45,10 @@ parser.add_argument('--inference_only', default=False, type=bool,
 parser.add_argument('--gpu_id', default='0', type=str,
                     help='How To Check? : cmd -> nvidia-smi')
 args = parser.parse_args()
+start = time.time()
 
 
-
-def train(model, predictor, trn_loader, criterion, optimizer, epoch, num_epoch, train_logger):
-    '''
-    p1, p2, z1, z2 = model(x1=images[0], x2=images[1])
-        loss = -(criterion(p1, z2).mean() + criterion(p2, z1).mean()) * 0.5
-
-        losses.update(loss.item(), images[0].size(0))
-
-        # compute gradient and do SGD step
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-    '''
+def train(model, trn_loader, criterion, optimizer, epoch, num_epoch, train_logger):
     model.train()
     train_loss = AverageMeter()
     for i, (audio,target) in enumerate(trn_loader):
@@ -78,8 +68,22 @@ def train(model, predictor, trn_loader, criterion, optimizer, epoch, num_epoch, 
     train_logger.write([epoch, train_loss.avg])
 
 
-def validation():
-    pass
+def validation(model, val_loader, criterion, epoch, num_epochs, val_logger):
+    model.eval()
+    val_loss = AverageMeter()
+    with torch.no_grad():
+        for i, (audio, target) in enumerate(val_loader):
+            audio = audio.cuda()
+            x1, x2 = sungrae_pedal(audio), sungrae_pedal(audio) # 어그멘트 해야하나??
+            p1,z2,p2,z1 = model(x1, x2)
+            loss = criterion(p1,z2,p2,z1)
+            val_loss.update(loss.item()*10000)
+
+        print("=================== Validation Start ====================")
+        print('Epoch : [{0}/{1}]  Test Loss : {loss:.4f}'.format(
+                epoch, num_epochs, loss=val_loss.avg))
+        print("=================== TEST(Validation) End ======================")
+        val_logger.write([epoch, val_loss.avg])
 
 
 def test():
@@ -96,11 +100,8 @@ def main():
             json.dump(args.__dict__, f, indent=2)
 
     # define architecture
-    # dataset의 input ouput shape에 맞게 
-    # backbone을 부르고 siam모델에 넣는 구조
-    # model = Siamusic()
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id
-
+    model = SimSiam(backbone=args.backbone).cuda()
 
     # dataset loading
     if args.dataset == 'MTA':
@@ -132,6 +133,7 @@ def main():
     val_logger = Logger(os.path.join(save_path, 'val_loss.log'))
     test_logger = Logger(os.path.join(save_path, 'test_loss.log'))
     
+    # train val test
     if args.inference_only: # Test only
         pass #학습된 모델 불러와서 테스트만 진행
     else: # (Train -> Val)xEpochs and then, Test
@@ -146,8 +148,8 @@ def main():
                                                     epoch)
                 torch.save(model.state_dict(), path)    
         draw_curve(save_path, train_logger, val_logger)
-        
-    print(f"Process Complete : it took {1}")
+    
+    print("Process Complete : it took {time:.2f} minutes".format(time=time.time()-start))
 
 if __name__ == '__main__':
     main()
