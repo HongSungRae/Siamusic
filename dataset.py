@@ -144,7 +144,7 @@ class WAVAudio(Dataset):
             raise ValueError()
         self.split = split
         self.input_length = input_length
-        self.dir = './data/' + type + '_audio'
+        self.dir = 'D:/SiamRec/data/' + type + '_audio'
         self.audios = os.listdir(self.dir)
         if split == 'train':
             self.data_list = self.audios[0:int(len(self.audios)*0.85)]

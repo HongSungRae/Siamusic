@@ -17,10 +17,10 @@ class Siamusic(nn.Module):
         self.to_db = torchaudio.transforms.AmplitudeToDB()
         self.spec_bn = nn.BatchNorm2d(1)
         
-        if backbone in ['resnet50', 'resnet101', 'resnet152']:
+        if backbone in ['resnet50','resnet101','resnet152']:
             self.encoder = models.__dict__[backbone](zero_init_residual=True,pretrained=False) # encoder: backbone + projector
             self.encoder.conv1 = nn.Conv2d(1, 64, kernel_size=(7,7), stride=(2,2), padding=(3,3), bias=False)
-        elif backbone == 'transformer':
+        elif backbone == 'Transformer':
             pass
         #     self.encoder_layer = nn.TransformerEncoderLayer(d_model=512, nhead=8)
         #     self.encoder = nn.TransformerEncoder(self.encoder_layer, num_layers=6)
@@ -65,7 +65,7 @@ class Siamusic(nn.Module):
         # x1, x2 위치 변경 두 가지 경우에 대한 output 모두 반환
         # case1 : p1, z2.deatach() 이용
         # case2 : z1.detach(), p2 이용
-        return p1, p2, z1.detach(), z2.detach() # z1, z2는 stop_gradient
+        return p1, z2.detach(), p2, z1.detach() # z1, z2는 stop_gradient
 
 
 if __name__ == '__main__':
