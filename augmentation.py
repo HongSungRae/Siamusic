@@ -123,7 +123,7 @@ def random_mix(audio,n_patchs=None):
 if __name__ == '__main__':
     input_length = 48000
     # MTA
-    print('== MTA ==')
+    print('== MTA - Pedal ==')
     mta_data = MTA('test',input_length=input_length)
     mta_dataloader = DataLoader(mta_data,batch_size=1,drop_last=True,shuffle=True)
     mta_x, mta_y = next(iter(mta_dataloader))
@@ -135,7 +135,7 @@ if __name__ == '__main__':
     listen(aug[0,0])
 
     # GTZAN
-    print('== GTZAN ==')
+    print('== GTZAN - Pedal ==')
     gtzan_data = GTZAN('validation',input_length=input_length)
     gtzan_dataloader = DataLoader(gtzan_data,batch_size=1,drop_last=True,shuffle=True)
     gtzan_x, gtzan_y = next(iter(gtzan_dataloader))
