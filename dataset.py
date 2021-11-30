@@ -134,6 +134,42 @@ class GTZAN(Dataset):
 
 
 
+class WAVAudio(Dataset):
+    '''
+    wav audio는 학습된 모델의 train/val단계에서 사용됩니다
+    mp3도 부를 수는 있으나 아직 python library는 많이 느립니다
+    '''
+    def __init__(self,split=None,input_length=48000,type='wav'):
+        if split not in ['train','validation']:
+            raise ValueError()
+        self.split = split
+        self.input_length = input_length
+        self.dir = './data/' + type + '_audio'
+        self.audios = os.listdir(self.dir)
+        if split == 'train':
+            self.data_list = self.audios[0:int(len(self.audios)*0.85)]
+        else:
+            self.data_list = self.audios[int(len(self.audios)*0.85):]
+
+    def __len__(self):
+        return len(self.data_list)
+
+    def get_waveform(self,data_path):#22050
+        waveform,_ = librosa.load(data_path,sr=22050,duration=60)
+        waveform = np.array(waveform,dtype=float)
+        random_idx = np.random.randint(low=0, high=int(waveform.shape[0] - self.input_length))
+        waveform = waveform[random_idx:random_idx+self.input_length] # extract 48000 sequence
+        audio = np.expand_dims(waveform, axis = 0) # expand to [1,48000]
+        return audio
+
+    def __getitem__(self, idx):
+        data_path = self.dir + '/' + self.data_list[idx]
+        waveform = self.get_waveform(data_path)
+        return waveform.astype(np.float32)
+
+
+
+
 if __name__ == '__main__':
     # MTA
     mta_data = MTA('test')
