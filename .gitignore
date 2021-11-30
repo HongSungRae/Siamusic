@@ -13111,3 +13111,6 @@ dataset/TestPOP/2NE1 - Missing U.mp3
 dataset/TestPOP/2NE1 - Hate You.mp3
 dataset/TestPOP/2NE1 - Go Away.mp3
 dataset/TestPOP/2NE1 - COME BACK HOME.mp3
+__pycache__/dataset.cpython-39.pyc
+__pycache__/simsiam.cpython-39.pyc
+__pycache__/utils.cpython-39.pyc
