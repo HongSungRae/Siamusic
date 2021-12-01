@@ -15,7 +15,7 @@ import sys
 
 # local
 from utils import *
-from dataset import MTA, GTZAN, WAVAudio
+from dataset import MTA, GTZAN, JsonAudio
 from loss import SiamusicLoss
 from augmentation import sungrae_pedal, random_mix
 from simsiam import Siamusic
@@ -56,6 +56,7 @@ def siam_train(model, trn_loader, criterion, optimizer, epoch, num_epoch, train_
     model.train()
     train_loss = AverageMeter()
     for i, audio in enumerate(trn_loader):
+        audio = audio.float()
         if args.augmentation == 'pedalboard':
             x1, x2 = sungrae_pedal(audio), sungrae_pedal(audio)
         elif args.augmentation == 'randommix':
@@ -110,7 +111,7 @@ def main():
     with open(save_path + '/configuration.json', 'w') as f:
         json.dump(args.__dict__, f, indent=2)
 
-    # define architecture
+    # define environment
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id
     model = Siamusic(backbone=args.backbone).cuda()
 
@@ -118,11 +119,10 @@ def main():
     # pre-training or fine-tuning
     if args.from_scratch: ## pre-training
         print('스크래치부터 학습됩니다.')
+
         # dataset loading
-        train_dataset = WAVAudio(split='train',input_length=args.input_length)
-        #val_dataset = WAVAudio(split='validation',input_length=args.input_length)
-        train_loader = DataLoader(train_dataset,batch_size=args.batch_size,num_workers=2,shuffle=True)
-        #val_loader = DataLoader(val_dataset,batch_size=args.batch_size,num_workers=2,shuffle=False)
+        train_dataset = JsonAudio('D:/SiamRec/data/json_audio',args.input_length)
+        train_loader = DataLoader(train_dataset,batch_size=args.batch_size,num_workers=2,shuffle=True,drop_last=True)
         print('=== DataLoader R.e.a.d.y ===')
 
         # define criterion
@@ -138,20 +138,18 @@ def main():
 
         # logger
         train_logger = Logger(os.path.join(save_path, 'train_loss.log'))
-        #val_logger = Logger(os.path.join(save_path, 'val_loss.log'))
 
         # 학습시작
         for epoch in tqdm(range(1,args.epochs+1)):
             siam_train(model, train_loader, criterion ,optimizer, epoch, args.epochs, train_logger)
-            #validation(model, val_loader, criterion, epoch, args.epochs, val_logger)
             scheduler.step()
             if epoch%20 == 0 or epoch == args.epochs :
                 path = '{0}/{1}_{2}_{3}.pth'.format(save_path,
                                                     args.backbone,
-                                                    args.dataset,
+                                                    args.augmentation,
                                                     epoch)
                 torch.save(model.state_dict(), path)    
-        draw_curve(save_path, train_logger)#, val_logger)
+        draw_curve(save_path, train_logger, train_logger)
 
         # 모델저장
     

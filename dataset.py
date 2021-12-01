@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import os
 import librosa
+import json
 # from scipy.io.wavfile import read
 
 
@@ -134,7 +135,7 @@ class GTZAN(Dataset):
 
 
 
-class WAVAudio(Dataset):
+class MPAudio(Dataset):
     '''
     wav audio는 학습된 모델의 train/val단계에서 사용됩니다
     mp3도 부를 수는 있으나 아직 python library는 많이 느립니다
@@ -170,6 +171,27 @@ class WAVAudio(Dataset):
 
 
 
+class JsonAudio(Dataset):
+    def __init__(self,data_dir,input_length):
+        self.data_dir = data_dir
+        self.data_list = os.listdir(data_dir)
+        self.input_length = input_length
+
+    def __len__(self):
+        return len(self.data_list)
+        
+    def __getitem__(self, idx):
+        with open(self.data_dir+'/'+self.data_list[idx], 'r') as f:
+            waveform = np.array(json.load(f)['audio'],dtype=float)
+        random_idx = np.random.randint(low=0, high=int(waveform.shape[-1] - self.input_length))
+        waveform = waveform[0][random_idx:random_idx+self.input_length]
+        audio = np.expand_dims(waveform, axis = 0) # expand to [1,48000]
+        return audio
+        
+
+
+
+
 if __name__ == '__main__':
     # MTA
     mta_data = MTA('test')
@@ -177,8 +199,20 @@ if __name__ == '__main__':
     mta_x, mta_y = next(iter(mta_dataloader))
     print(f'mta_x : {mta_x.shape} | mta_y : {mta_y.shape}')
 
-    # GTZAN
+    # # GTZAN
     gtzan_data = GTZAN('validation')
     gtzan_dataloader = DataLoader(gtzan_data,batch_size=16,drop_last=True)
     gtzan_x, gtzan_y = next(iter(gtzan_dataloader))
     print(f'gtzan_x : {gtzan_x.shape} | gtzan_y : {gtzan_y.shape}')
+
+    # # MPAudio
+    # mp3_data = MPAudio('validation',48000,'mp3')
+    # mp3_dataloader = DataLoader(mp3_data,batch_size=4,drop_last=True)
+    # mp3_x = next(iter(mp3_dataloader))
+    # print(f'mp3_x : {mp3_x.shape}')
+
+    # JsonAudio
+    json_data = JsonAudio('D:/SiamRec/data/json_audio',48000)
+    json_dataloader = DataLoader(json_data,batch_size=16,drop_last=True)
+    json_x = next(iter(json_dataloader))
+    print(f'json_x : {json_x.shape}')
