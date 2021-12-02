@@ -212,7 +212,7 @@ if __name__ == '__main__':
     # print(f'mp3_x : {mp3_x.shape}')
 
     # JsonAudio
-    json_data = JsonAudio('D:/SiamRec/data/json_audio',48000)
-    json_dataloader = DataLoader(json_data,batch_size=16,drop_last=True)
-    json_x = next(iter(json_dataloader))
-    print(f'json_x : {json_x.shape}')
+    # json_data = JsonAudio('D:/SiamRec/data/json_audio',48000)
+    # json_dataloader = DataLoader(json_data,batch_size=16,drop_last=True)
+    # json_x = next(iter(json_dataloader))
+    # print(f'json_x : {json_x.shape}')
