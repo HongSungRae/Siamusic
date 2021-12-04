@@ -127,8 +127,9 @@ class GTZAN(Dataset):
         
     def __getitem__(self, index):
         genre = self.df['Label'][index]
-        label = torch.zeros(10)
-        label[self.genres.index(genre)] = 1
+        # label = torch.zeros(10) # one-hot
+        # label[self.genres.index(genre)] = 1 # one-hot
+        label = torch.tensor(self.genres.index(genre))
         data_path = self.df['Path'][index] + '/' + self.df['Name'][index]
         audio = self.get_waveform(data_path)
         return audio, label

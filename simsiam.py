@@ -21,6 +21,7 @@ class Evaluator(nn.Module):
         # 논문보니까 linear evaluation은 설계하기 나름인듯
         self.encoder = encoder
         self.backbone = backbone
+        self.num_classes = num_classes
         self.evaluator = nn.Sequential(nn.Linear(dim,1024),
                                        nn.ReLU(),
                                        nn.Linear(1024,512),
@@ -40,6 +41,7 @@ class Evaluator(nn.Module):
         
         logit = self.encoder(audio)
         logit = self.evaluator(logit)
+        
         return logit
 
 

@@ -1,5 +1,6 @@
 # library
 from numpy.random import choice
+from torch.nn.modules.activation import Threshold
 from torch.utils.data import DataLoader
 import os
 import torch
@@ -8,6 +9,7 @@ import torch.optim as optim
 import json
 import torch.nn as nn
 from torch.optim import lr_scheduler
+from torchmetrics.classification import accuracy
 from tqdm import tqdm
 from torchmetrics import F1,AUROC,Accuracy,Recall
 import time
@@ -51,6 +53,8 @@ parser.add_argument('--patchs', default=12, type=int,
 parser.add_argument('--from_scratch', default=False, type=bool,
                     action=argparse.BooleanOptionalAction,
                     help='How To Make TRUE? : --from_scratch, Flase : --no-from_scratch')
+parser.add_argument('--threshold', default=0.5, type=float,
+                    help='MTA 에서 confidence가 얼마 이상이면 1로 예측했다고 할 것인가?')
 									
 parser.add_argument('--gpu_id', default='0', type=str,
                     help='How To Check? : cmd -> nvidia-smi')
@@ -90,10 +94,10 @@ def siam_train(model, trn_loader, criterion, optimizer, epoch, num_epoch, train_
 def train(model, trn_loader, criterion, optimizer, epoch, num_epoch, train_logger):
     model.train()
     train_loss = AverageMeter()
-    for i, audio,target in enumerate(trn_loader):
-        audio, target = audio.float().cuda(), target.float().cuda()
+    for i, (audio,target) in enumerate(trn_loader):
+        audio, target = audio.float().cuda(), target.cuda()
         y_pred = model(audio)
-        loss = criterion(target,y_pred)
+        loss = criterion(y_pred,target)
         train_loss.update(loss.item())
         optimizer.zero_grad()
         loss.backward()
@@ -107,17 +111,17 @@ def train(model, trn_loader, criterion, optimizer, epoch, num_epoch, train_logge
 
 # downstream task validation
 def validation(model, val_loader, criterion, epoch, num_epochs, val_logger):
+    print("=================== Validation Start ====================")
     model.eval()
     val_loss = AverageMeter()
     with torch.no_grad():
-        for i, audio, target in enumerate(val_loader):
-            audio, target = audio.cuda(), target.cuda()
+        for i, (audio, target) in enumerate(val_loader):
+            audio, target = audio.float().cuda(), target.cuda()
             y_pred = model(audio)
-            loss = criterion(target,y_pred)
+            loss = criterion(y_pred,target)
             val_loss.update(loss.item())
 
-        print("=================== Validation Start ====================")
-        print('Epoch : [{0}/{1}]  Test Loss : {loss:.4f}'.format(
+        print('Epoch : [{0}/{1}]  Validation Loss : {loss:.4f}'.format(
                 epoch, num_epochs, loss=val_loss.avg))
         print("=================== Validation End ======================")
         val_logger.write([epoch, val_loss.avg])
@@ -125,20 +129,72 @@ def validation(model, val_loader, criterion, epoch, num_epochs, val_logger):
 
 
 def test(model, test_loader, dataset):
-    # MTA : ACC@5, ACC@10, RECALL@5, RECALL@10
-    # GTZAN : F1, AUROC, AUPRC, ACC@1, ACC@5
+    # MTA : 
+    # GTZAN : ACC@1, ACC@5, Recall@1, Recall@5, F1@1, F1@5
+    print("=================== Test Start ====================")
     model.eval()
-    if dataset == 'MTA':
-        pass
-    elif dataset == 'GTZAN':
-        pass
-    
-    with torch.no_grad():
-        for i,audio,target in enumerate(test_loader):
-            pass
-        print("=================== Test Start ====================")
 
-        print("=================== Test End ====================")
+    if dataset == 'MTA':
+        threshold = args.threshold
+        accuracy = Accuracy(num_classes=50,threshold=threshold)
+        f1 = F1(num_classes=50,threshold=threshold)
+        recall = Recall(num_classes=50,threshold=threshold)
+        auroc = AUROC(num_classes=50,pos_label=1)
+        aves = [AverageMeter(), # acc@1
+                AverageMeter(), # recall@1
+                AverageMeter(), # f1@1
+                AverageMeter()] # AUROC
+        with torch.no_grad():
+            for i,(audio,target) in enumerate(test_loader):
+                audio, target = audio.float().cuda(), target
+                y_pred = model(audio)
+                y_pred = y_pred.detach().cpu()
+                aves[0].update(accuracy(y_pred,target.int()))
+                aves[1].update(f1(y_pred,target.int()))
+                aves[2].update(recall(y_pred,target.int()))
+                # aves[3].update(auroc(y_pred,target.int())) # 외않되쥐
+
+            print(f'ACC@1 : {aves[0].avg:.2f}±{aves[0].std:.2f}')
+            print(f'F1@1 : {aves[1].avg:.2f}±{aves[1].std:.2f}')
+            print(f'Recall@1 : {aves[2].avg:.2f}±{aves[2].std:.2f}')
+            print(f'AUROC@1 : {aves[3].avg:.2f}±{aves[3].std:.2f}')
+                    
+                
+    elif dataset == 'GTZAN':
+        # https://nittaku.tistory.com/295
+        accuracy_at_1 = Accuracy(10)
+        accuracy_at_5 = Accuracy(10,top_k=5)
+        recall_at_1 = Recall(10)
+        recall_at_5 = Recall(10,top_k=5)
+        f1_at_1 = F1(num_classes=10)
+        f1_at_5 = F1(num_classes=10,top_k=5)
+        aves = [AverageMeter(), # acc@1
+                AverageMeter(), # acc@5
+                AverageMeter(), # recall@1
+                AverageMeter(), # recall@5
+                AverageMeter(), # f1@1
+                AverageMeter()] # f1@5
+        with torch.no_grad():
+            for i,(audio,target) in enumerate(test_loader):
+                audio, target = audio.float().cuda(), target
+                y_pred = model(audio)
+                y_pred = y_pred.detach().cpu()
+                aves[0].update(accuracy_at_1(y_pred,target))
+                aves[1].update(accuracy_at_5(y_pred,target))
+                aves[2].update(recall_at_1(y_pred,target))
+                aves[3].update(recall_at_5(y_pred,target))
+                aves[4].update(f1_at_1(y_pred,target))
+                aves[5].update(f1_at_5(y_pred,target))
+                
+            print(f'ACC@1 : {aves[0].avg:.2f}±{aves[0].std:.2f}')
+            print(f'ACC@5 : {aves[1].avg:.2f}±{aves[1].std:.2f}')
+            print(f'Recall@1 : {aves[2].avg:.2f}±{aves[2].std:.2f}')
+            print(f'Recall@5 : {aves[3].avg:.2f}±{aves[3].std:.2f}')
+            print(f'F1@1 : {aves[4].avg:.2f}±{aves[4].std:.2f}')
+            print(f'F1@5 : {aves[5].avg:.2f}±{aves[5].std:.2f}')
+
+
+    print("=================== Test End ====================")
 
 
 def main():
@@ -185,6 +241,7 @@ def main():
         for epoch in tqdm(range(1,args.epochs+1)):
             siam_train(model, train_loader, criterion ,optimizer, epoch, args.epochs, train_logger)
             scheduler.step()
+            # 모델저장
             if epoch%20 == 0 or epoch == args.epochs :
                 path = '{0}/{1}_{2}_{3}.pth'.format(save_path,
                                                     args.backbone,
@@ -192,8 +249,6 @@ def main():
                                                     epoch)
                 torch.save(model.state_dict(), path)    
         draw_curve(save_path, train_logger, train_logger)
-
-        # 모델저장
     
     else: ## fine-tuning
         print('Fine-tuning을 시작합니다.')
@@ -223,13 +278,22 @@ def main():
         print('=== DataLoader R.e.a.d.y ===')
 
         # 모델 불러오기 & pretrain모델 주입
+        '''
+        https://justkode.kr/deep-learning/pytorch-save
+        https://tutorials.pytorch.kr/beginner/saving_loading_models.html
+        '''
         PATH = './exp_' + args.backbone + '_' + args.augmentation + '_' + args.optim
-        pth_file = args.backbone+'_'+args.aumentation+'_300.pth'
+        pth_file = args.backbone+'_'+args.augmentation+'_100.pth'
         model.load_state_dict(torch.load(PATH+'/'+pth_file))
-        evaluation_model = Evaluator(model.encoder,num_classes,args.backbone,args.dim) # 내부에서 encoder freeze잊지말기
+        evaluation_model = Evaluator(model.encoder,num_classes,args.backbone,args.dim).cuda() # 내부에서 encoder freeze잊지말기
         
         # define criterion
-        criterion = nn.CrossEntropyLoss().cuda()
+        if args.dataset == 'MTA':
+            criterion = nn.BCEWithLogitsLoss().cuda()
+        elif args.dataset == 'GTZAN':
+            criterion = nn.CrossEntropyLoss().cuda()
+
+        # define optimizer
         if args.optim == 'sgd':
             optimizer = optim.SGD(evaluation_model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
         elif args.optim == 'adam':
@@ -242,7 +306,6 @@ def main():
         # logger
         train_logger = Logger(os.path.join(save_path, 'train_loss.log'))
         val_logger = Logger(os.path.join(save_path, 'val_loss.log'))
-        test_logger = Logger(os.path.join(save_path, 'test_loss.log'))
 
         # 학습시작
         best_loss = 10000
@@ -252,21 +315,27 @@ def main():
             train(evaluation_model, train_loader, criterion ,optimizer, epoch, args.epochs, train_logger)
             val_loss = validation(evaluation_model, val_loader, criterion, epoch, args.epochs, val_logger)
             scheduler.step()
-            if val_loss < best_loss:
-                best_loss = val_loss
-                worse = 0
-                model_dict = evaluation_model.state_dict()
-            else:
-                worse += 1
+            # if val_loss < best_loss:
+            #     best_loss = val_loss
+            #     worse = 0
+            #     model_dict = evaluation_model.state_dict()
+            # else:
+            #     worse += 1
     
-            if worse > 4 :
-                print('== Early Stopping ==')
+            # if worse > 4 :
+            #     print('== Early Stopping ==')
+            #     path = '{0}/{1}_{2}_{3}.pth'.format(save_path,
+            #                                         args.backbone,
+            #                                         args.augmentation,
+            #                                         epoch)
+            #     torch.save(model_dict, path)
+            #     break
+            if epoch == args.epochs:
                 path = '{0}/{1}_{2}_{3}.pth'.format(save_path,
                                                     args.backbone,
                                                     args.augmentation,
                                                     epoch)
-                torch.save(model_dict, path)
-                break    
+                torch.save(evaluation_model.state_dict(), path)
         draw_curve(save_path, train_logger, val_logger)
 
         # 테스트시작
