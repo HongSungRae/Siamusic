@@ -129,7 +129,7 @@ def validation(model, val_loader, criterion, epoch, num_epochs, val_logger):
 
 
 def test(model, test_loader, dataset):
-    # MTA : 
+    # MTA : ACC@1, Recall@1, Recall@5
     # GTZAN : ACC@1, ACC@5, Recall@1, Recall@5, F1@1, F1@5
     print("=================== Test Start ====================")
     model.eval()
@@ -137,11 +137,9 @@ def test(model, test_loader, dataset):
     if dataset == 'MTA':
         threshold = args.threshold
         accuracy = Accuracy(num_classes=50,threshold=threshold) # TN이 많아서 ACC자체는 높게 나온다
-        f1 = F1(num_classes=50,threshold=threshold)
         aves = [AverageMeter(), # acc@1
                 AverageMeter(), # recall@1
-                AverageMeter(), # recall@5
-                AverageMeter()] # f1
+                AverageMeter()] # recall@5
         with torch.no_grad():
             for i,(audio,target) in enumerate(test_loader):
                 audio, target = audio.float().cuda(), target
@@ -150,12 +148,10 @@ def test(model, test_loader, dataset):
                 aves[0].update(accuracy(y_pred,target.int()))
                 aves[1].update(recall_at_k(y_pred,target,1))
                 aves[2].update(recall_at_k(y_pred,target,5))
-                aves[3].update(f1(y_pred,target.int()))
 
             print(f'ACC@1 : {aves[0].avg:.2f}±{aves[0].std:.2f}')
             print(f'Recall@1 : {aves[1].avg:.2f}±{aves[1].std:.2f}')
             print(f'Recall@5 : {aves[2].avg:.2f}±{aves[2].std:.2f}')
-            print(f'F1@1 : {aves[3].avg:.2f}±{aves[3].std:.2f}')
                     
                 
     elif dataset == 'GTZAN':
