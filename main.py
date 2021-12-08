@@ -136,28 +136,26 @@ def test(model, test_loader, dataset):
 
     if dataset == 'MTA':
         threshold = args.threshold
-        accuracy = Accuracy(num_classes=50,threshold=threshold)
+        accuracy = Accuracy(num_classes=50,threshold=threshold) # TN이 많아서 ACC자체는 높게 나온다
         f1 = F1(num_classes=50,threshold=threshold)
-        recall = Recall(num_classes=50,threshold=threshold)
-        auroc = AUROC(num_classes=50,pos_label=1)
         aves = [AverageMeter(), # acc@1
                 AverageMeter(), # recall@1
-                AverageMeter(), # f1@1
-                AverageMeter()] # AUROC
+                AverageMeter(), # recall@5
+                AverageMeter()] # f1
         with torch.no_grad():
             for i,(audio,target) in enumerate(test_loader):
                 audio, target = audio.float().cuda(), target
                 y_pred = model(audio)
                 y_pred = y_pred.detach().cpu()
                 aves[0].update(accuracy(y_pred,target.int()))
-                aves[1].update(f1(y_pred,target.int()))
-                aves[2].update(recall(y_pred,target.int()))
-                # aves[3].update(auroc(y_pred,target.int())) # 외않되쥐
+                aves[1].update(recall_at_k(y_pred,target,1))
+                aves[2].update(recall_at_k(y_pred,target,5))
+                aves[3].update(f1(y_pred,target.int()))
 
             print(f'ACC@1 : {aves[0].avg:.2f}±{aves[0].std:.2f}')
-            print(f'F1@1 : {aves[1].avg:.2f}±{aves[1].std:.2f}')
-            print(f'Recall@1 : {aves[2].avg:.2f}±{aves[2].std:.2f}')
-            print(f'AUROC@1 : {aves[3].avg:.2f}±{aves[3].std:.2f}')
+            print(f'Recall@1 : {aves[1].avg:.2f}±{aves[1].std:.2f}')
+            print(f'Recall@5 : {aves[2].avg:.2f}±{aves[2].std:.2f}')
+            print(f'F1@1 : {aves[3].avg:.2f}±{aves[3].std:.2f}')
                     
                 
     elif dataset == 'GTZAN':
@@ -284,13 +282,22 @@ def main():
         '''
         PATH = './exp_' + args.backbone + '_' + args.augmentation + '_' + args.optim
         pth_file = args.backbone+'_'+args.augmentation+'_100.pth'
-        model.load_state_dict(torch.load(PATH+'/'+pth_file))
-        evaluation_model = Evaluator(model.encoder,num_classes,args.backbone,args.dim).cuda() # 내부에서 encoder freeze잊지말기
+        try:
+            model.load_state_dict(torch.load(PATH+'/'+pth_file))
+        except:
+            os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+            model = Siamusic(backbone=args.backbone,
+                             dim=args.dim,
+                             nhead=args.nhead).cuda()
+            model.load_state_dict(torch.load(PATH+'/'+pth_file))
+        for para in model.parameters(): # endoer freeze
+            para.requires_grad = False
+        evaluation_model = Evaluator(model.encoder,num_classes,args.backbone,args.dim).cuda()
         
         # define criterion
-        if args.dataset == 'MTA':
+        if args.dataset == 'MTA': # 50 multi-classes
             criterion = nn.BCEWithLogitsLoss().cuda()
-        elif args.dataset == 'GTZAN':
+        elif args.dataset == 'GTZAN': # 10 single classes
             criterion = nn.CrossEntropyLoss().cuda()
 
         # define optimizer
@@ -307,7 +314,7 @@ def main():
         train_logger = Logger(os.path.join(save_path, 'train_loss.log'))
         val_logger = Logger(os.path.join(save_path, 'val_loss.log'))
 
-        # 학습시작
+        # 학습시작 (아래는 early sttoping이나 test 성능이 나빠서 일단 주석처리)
         best_loss = 10000
         worse = 0
         model_dict = None

@@ -17,6 +17,7 @@ import os
 from tqdm import tqdm
 import librosa
 import json
+import torch
 
 # local
 from dataset import MTA, GTZAN, JsonAudio
@@ -24,10 +25,39 @@ from dataset import MTA, GTZAN, JsonAudio
 
 
 
-# from_dir에 있는 모든 audio를 duration(초)만큼만 load합니다
-# load된 array를 key=노래제목, value = list(array)로
-# to_dir에 저장합니다
-def mp3_to_json(from_dir,to_dir,duration=60,sr=22050):
+################
+#### Metric ####
+################
+def recall_at_k(pred,target,k):
+    recall = []
+    for i in range(len(pred)):
+        inter = 0
+        query = pred[i]
+        y_q = target[i]
+        idx = torch.argsort(query,dim=0).tolist()
+        idx.reverse()
+        idx = idx[0:k] # k개의 top index
+        for j in idx:
+            if y_q.tolist()[j] == 1:
+                inter += 1
+        recall.append(inter/len(torch.where(y_q==1)[0]))
+    
+    return sum(recall)/len(recall)
+
+
+
+
+
+
+################
+## Audio 관련 ##
+################
+def mp3_to_json(from_dir,to_dir,folder,duration=60,sr=22050):
+    '''
+    from_dir에 있는 모든 audio를 duration(초)만큼만 load합니다
+    load된 array를 key=노래제목, value = list(array)로
+    to_dir에 저장합니다
+    '''
     music_list = os.listdir(from_dir)
     # os.chdir(to_dir)
     for music in tqdm(music_list):
@@ -36,7 +66,7 @@ def mp3_to_json(from_dir,to_dir,duration=60,sr=22050):
             audio = np.array(audio,dtype=float)
             audio = np.expand_dims(audio, axis = 0)
             audio_dict = {'audio' : audio.tolist()}
-            with open(to_dir+'/'+music+'.json', 'w') as fp:
+            with open(to_dir+'/'+folder+'_'+music+'.json', 'w') as fp:
                 json.dump(audio_dict, fp)
         except:
             print(f'{music}은(는) 변환되지 않습니다.')
@@ -44,9 +74,12 @@ def mp3_to_json(from_dir,to_dir,duration=60,sr=22050):
 
 
 
-# from_dir의 모든 mp3 file을 
-# wav format으로 바꾸어 to_dir로 보냅니다
+
 def mp3_to_wav(from_dir,to_dir):
+    '''
+    from_dir의 모든 mp3 file을
+    wav format으로 바꾸어 to_dir로 보냅니다
+    '''
     mp3_list = os.listdir(dir)
     for mp3 in tqdm(mp3_list):                                                                      
         src = from_dir + '/' + mp3
@@ -60,10 +93,15 @@ def mp3_to_wav(from_dir,to_dir):
 
 
 
-# 'audio' is waveform which type is torch.tensor
-# audio shape : [fs], sampling rate = 22050
+
 def listen(audio,fs=48000):
+    '''
+    "audio" is waveform which type is torch.tensor
+    audio shape : [fs], sampling rate = 22050
+    '''
     sd.play(audio, 22050, blocking=True)
+
+
 
 
 def listen_raw(data_path):
