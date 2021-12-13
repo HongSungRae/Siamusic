@@ -3,3 +3,4 @@ pedalboard
 sounddevice
 librosa
 torchmetrics
+albumentations

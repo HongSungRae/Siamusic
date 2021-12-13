@@ -2,14 +2,18 @@
 input : torch.tensor() (16,1,48000)
 output : augmented audio tensor
 '''
+from numpy.core.records import array
 import pedalboard
 import random
 import time
 from utils import listen
 from dataset import MTA, GTZAN
 import torch
+import torch.nn as nn
 from torch.utils.data import DataLoader
 import numpy as np
+import albumentations as A
+import torchaudio
 from pedalboard import (Pedalboard, 
                         Convolution, 
                         Compressor, 
@@ -120,46 +124,91 @@ def random_mix(audio,n_patchs=None):
 
 
 
+
+def image_augmentation(audio,sample_rate=22050,n_fft=512,f_min=0.0,f_max=8000.0,n_mels=96):
+    assert audio != None
+    aug_audio = audio.clone()
+    mel = torchaudio.transforms.MelSpectrogram(sample_rate=sample_rate,
+                                                   n_fft=n_fft,
+                                                   f_min=f_min,
+                                                   f_max=f_max,
+                                                   n_mels=48)
+    to_db = torchaudio.transforms.AmplitudeToDB()
+    spec_bn = nn.BatchNorm2d(1)
+    albumentations_transform_oneof = A.Compose([
+        # A.Resize(96, 188), 
+        # A.RandomCrop(224, 224),
+        A.OneOf([A.HorizontalFlip(p=1), 
+                 A.ShiftScaleRotate(p=1)
+        ], p=1),
+    ])
+    for idx in range(audio.shape[0]):
+        temp = audio[idx].clone() # [1,48000]
+        temp = mel(temp) # [1,96,188]
+        temp = to_db(temp) # [1,96,188]
+        temp = torch.unsqueeze(temp,0) # [1,1,96,188]
+        temp = spec_bn(temp)
+        temp = torch.squeeze(temp,0) # [1,96,188]
+        temp = temp.detach().numpy()
+        temp = albumentations_transform_oneof(image=temp)['image'] # [1,48,188]??
+        temp = torch.Tensor(temp) # 여기 수정필요
+    return aug_audio
+
+
+
 if __name__ == '__main__':
+    # DataLoader
     input_length = 48000
-    # MTA
-    print('== MTA - Pedal ==')
     mta_data = MTA('test',input_length=input_length)
     mta_dataloader = DataLoader(mta_data,batch_size=3,drop_last=True,shuffle=True)
     mta_x, mta_y = next(iter(mta_dataloader))
-    print('- Origianl Sounds')
-    listen(mta_x[0,0])
-    aug = sungrae_pedal(mta_x)
-    time.sleep(1)
-    print('- Now on pedal sounds')
-    listen(aug[0,0])
-
-    # GTZAN
-    print('== GTZAN - Pedal ==')
     gtzan_data = GTZAN('validation',input_length=input_length)
     gtzan_dataloader = DataLoader(gtzan_data,batch_size=3,drop_last=True,shuffle=True)
     gtzan_x, gtzan_y = next(iter(gtzan_dataloader))
-    print('- Origianl Sounds')
-    listen(gtzan_x[0,0])
-    aug = sungrae_pedal(gtzan_x)
-    time.sleep(1)
-    print('- Now on pedal sounds')
-    listen(aug[0,0])
+    
+    # # MTA - Pedal
+    # print('== MTA - Pedal ==')
+    # print('- Origianl Sounds')
+    # listen(mta_x[0,0])
+    # aug = sungrae_pedal(mta_x)
+    # time.sleep(1)
+    # print('- Now on pedal sounds')
+    # listen(aug[0,0])
 
-    # MTA-Mix
-    print('== MTA - Mix ==')
-    print('- Origianl Sounds')
-    listen(mta_x[1,0])
-    aug = random_mix(mta_x,12)
-    time.sleep(1)
-    print('- Now on pedal sounds')
-    listen(aug[1,0])
+    # # GTZAN - Pedal
+    # print('== GTZAN - Pedal ==')
+    # print('- Origianl Sounds')
+    # listen(gtzan_x[0,0])
+    # aug = sungrae_pedal(gtzan_x)
+    # time.sleep(1)
+    # print('- Now on pedal sounds')
+    # listen(aug[0,0])
 
-    # GTZAN-Mix
-    print('== GTZAN - Mix ==')
-    print('- Origianl Sounds')
-    listen(gtzan_x[1,0])
-    aug = random_mix(gtzan_x,12)
-    time.sleep(1)
-    print('- Now on pedal sounds')
-    listen(aug[1,0])
+    # # MTA-Mix
+    # print('== MTA - Mix ==')
+    # print('- Origianl Sounds')
+    # listen(mta_x[1,0])
+    # aug = random_mix(mta_x,12)
+    # time.sleep(1)
+    # print('- Now on pedal sounds')
+    # listen(aug[1,0])
+
+    # # GTZAN-Mix
+    # print('== GTZAN - Mix ==')
+    # print('- Origianl Sounds')
+    # listen(gtzan_x[1,0])
+    # aug = random_mix(gtzan_x,12)
+    # time.sleep(1)
+    # print('- Now on pedal sounds')
+    # listen(aug[1,0])
+
+    # MTA-ImageAug
+    # print('== MTA - ImageAug ==')
+    # print('- Origianl Sounds')
+    # listen(mta_x[2,0])
+    # aug = image_augmentation(mta_x)
+    # time.sleep(1)
+    # print('- Now on ImageAug sounds')
+    # listen(aug[2,0])
+    # print(mta_x[0,0,0:100])
+    # print(aug[0,0,0:100])

@@ -13,8 +13,8 @@ class MTA(Dataset):
     def __init__(self,split=None,input_length=48000):
         self.split = split
         self.input_length = input_length
-        if split not in ['train', 'test', 'validation']:
-            raise ValueError("Please tell the data split : train, test,validation")
+        if split not in ['train', 'test', 'validation', 'fine']:
+            raise ValueError("Please tell the data split : train, test, validation or fine")
         
         self.data_path = './dataset/MTA/waveform'
         self.df = pd.read_csv('./dataset/MTA/annotations_final.csv', sep="\t", index_col=0)
@@ -43,6 +43,8 @@ class MTA(Dataset):
                 split_list.append(id)
             elif split=='validation' and (folder == "c"):    
                 split_list.append(id)
+            elif split=='fine' and (folder == "c"):    
+                split_list.append(id)
             elif split=='test' and (folder in "d"):
                 split_list.append(id)
         self.df = self.df[self.TAGS]
@@ -65,8 +67,7 @@ class MTA(Dataset):
         random_idx = np.random.randint(low=0, high=int(waveform.shape[0] - self.input_length))
         waveform = waveform[random_idx:random_idx+self.input_length] # extract 48000 sequence
         audio = np.expand_dims(waveform, axis = 0) # expand to [1,48000]
-        return audio
-
+        return audio # [1,48000]
 
 
 
@@ -159,7 +160,10 @@ class MPAudio(Dataset):
     def get_waveform(self,data_path):#22050
         waveform,_ = librosa.load(data_path,sr=22050,duration=60)
         waveform = np.array(waveform,dtype=float)
-        random_idx = np.random.randint(low=0, high=int(waveform.shape[0] - self.input_length))
+        try:
+            random_idx = np.random.randint(low=0, high=int(waveform.shape[0] - self.input_length))
+        except:
+            random_idx = 0
         waveform = waveform[random_idx:random_idx+self.input_length] # extract 48000 sequence
         audio = np.expand_dims(waveform, axis = 0) # expand to [1,48000]
         return audio
@@ -184,9 +188,14 @@ class JsonAudio(Dataset):
     def __getitem__(self, idx):
         with open(self.data_dir+'/'+self.data_list[idx], 'r') as f:
             waveform = np.array(json.load(f)['audio'],dtype=float)
-        random_idx = np.random.randint(low=0, high=int(waveform.shape[-1] - self.input_length))
-        waveform = waveform[0][random_idx:random_idx+self.input_length]
-        audio = np.expand_dims(waveform, axis = 0) # expand to [1,48000]
+        try:
+            random_idx = np.random.randint(low=0, high=int(waveform.shape[-1] - self.input_length))
+            waveform = waveform[0][random_idx:random_idx+self.input_length]
+            audio = np.expand_dims(waveform, axis = 0) # expand to [1,48000]
+        except:
+            temp = np.zeros((48000))
+            temp[0:int(waveform.shape[-1])] = waveform
+            audio = np.expand_dims(temp, axis = 0) # expand to [1,48000]
         return audio
         
 

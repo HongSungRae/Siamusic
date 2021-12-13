@@ -225,7 +225,7 @@ def main():
             print('스크래치부터 학습됩니다 : MTA')
 
             # save path
-            save_path=args.save_path+'_'+args.backbone+'_'+args.augmentation+'_'+args.optim+'_'+MTA
+            save_path=args.save_path+'_'+args.backbone+'_'+args.augmentation+'_'+args.optim+'_'+'MTA'
             if not os.path.exists(save_path):
                 os.makedirs(save_path)
 
@@ -268,9 +268,11 @@ def main():
                                                         epoch)
                     torch.save(model.state_dict(), path)    
             draw_curve(save_path, train_logger, train_logger)
+
             
         elif args.GTZAN: # GTZAN으로 pre-train
             sys.exit('NonImplementError')
+
         else: # FMA로 pre-train
             print(f'스크래치부터 학습됩니다 : FMA_{args.fma}')
 
@@ -319,7 +321,7 @@ def main():
     else: ## fine-tuning
         print('Fine-tuning을 시작합니다.')
         # save path
-        save_path=args.save_path+'_'+args.dataset+'_'+args.backbone+'_'+args.augmentation+'_'+args.optim+'_'+args.fma
+        save_path=args.save_path+'_MTA_'+args.backbone+'_'+args.augmentation+'_'+args.optim+'_MTA'
         if not os.path.exists(save_path):
             os.makedirs(save_path)
         
@@ -329,13 +331,13 @@ def main():
 
         # dataset loading
         if args.dataset == 'MTA':
-            train_dataset = MTA(split='train',input_length=args.input_length)
-            val_dataset = MTA(split='validation',input_length=args.input_length)
+            train_dataset = MTA(split='fine',input_length=args.input_length)
+            val_dataset = MTA(split='test',input_length=args.input_length)
             test_dataset = MTA(split='test',input_length=args.input_length)
             num_classes = 50
         elif args.dataset == 'GTZAN':
-            train_dataset = GTZAN(split='train',input_length=args.input_length)
-            val_dataset = GTZAN(split='validation',input_length=args.input_length)
+            train_dataset = GTZAN(split='fine',input_length=args.input_length)
+            val_dataset = GTZAN(split='test',input_length=args.input_length)
             test_dataset = GTZAN(split='test',input_length=args.input_length)
             num_classes = 10
         train_loader = DataLoader(train_dataset,batch_size=args.batch_size,num_workers=2,shuffle=True)
@@ -348,7 +350,7 @@ def main():
         https://justkode.kr/deep-learning/pytorch-save
         https://tutorials.pytorch.kr/beginner/saving_loading_models.html
         '''
-        PATH = './exp_' + args.backbone + '_' + args.augmentation + '_' + args.optim + '_' + args.fma
+        PATH = './exp_' + args.backbone + '_' + args.augmentation + '_' + args.optim + '_MTA'
         pth_file = args.backbone+'_'+args.augmentation+'_100.pth'
         try:
             os.environ['CUDA_VISIBLE_DEVICES'] = '0'
